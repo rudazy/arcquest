@@ -1,0 +1,44 @@
+{
+  "name": "arcquest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Arc Terminal — Quest and XP platform for the Arc ecosystem.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@privy-io/react-auth": "3.19.0",
+    "@supabase/ssr": "0.10.0",
+    "@supabase/supabase-js": "2.101.1",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "framer-motion": "12.38.0",
+    "lucide-react": "1.7.0",
+    "next": "14.2.33",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "tailwind-merge": "3.4.1",
+    "tailwindcss-animate": "1.0.7",
+    "viem": "2.47.6",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.39",
+    "@types/react": "18.3.28",
+    "@types/react-dom": "18.3.7",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.33",
+    "postcss": "8.5.8",
+    "tailwindcss": "3.4.19",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.30.1"
+}

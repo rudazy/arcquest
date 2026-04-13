@@ -293,9 +293,45 @@ for Step 2 to start building features against.
 
 ---
 
+## Completed — Step 10 (2026-04-13)
+
+- Created user types: `src/types/user.ts`
+  - `UserNft`, `CompletedTask`, `UserProfile` interfaces
+  - Reuses `NftTier` from leaderboard types (no duplication)
+  - Barrel-exported via `src/types/index.ts`
+- Created XP utilities: `src/lib/xp-utils.ts`
+  - `getLevel(xp)` — maps XP to level 1-5 using canonical thresholds
+  - `getXpToNextLevel(xp)` — returns current/required/level for progress bars
+  - `getLevelLabel(level)` — returns title string per level
+  - `getNftMilestones(xp)` — returns earned NFT tiers based on XP
+- Created mock user: `src/lib/user-mock.ts`
+  - "ludarep" — Lv3, 420 XP, rank 3, 6 completed tasks, bronze NFT
+- Built dashboard: `src/app/dashboard/page.tsx`
+  - Privy error boundary + wallet guard (connect prompt when disconnected)
+  - Section 1: user header with gradient avatar, display name, level badge, rank link
+  - Section 2: XP progress card with animated progress bar (420/500 toward Lv4)
+  - Section 3: 4-card stats row (tasks, XP, level, rank)
+  - Section 4: NFT milestones — 3 cards (bronze earned with date, silver/gold locked with progress)
+  - Section 5: recent tasks list with project logo circles, task names, XP badges, dates
+  - Section 6: quick actions row (Find Tasks, Take Quiz, View Leaderboard)
+- Created shared profile component: `src/components/profile/profile-view.tsx`
+  - Reusable across both profile pages — stats, NFT gallery, completed tasks
+- Built profile page: `src/app/profile/page.tsx`
+  - Privy-aware — shows "This is you" banner if wallet connected
+  - Public-facing read-only view with NFT collection and completed tasks
+- Built address profile page: `src/app/profile/[address]/page.tsx`
+  - Dynamic route, compares connected wallet to address param for "This is you"
+  - TODO comments for Supabase query replacement
+- Build: 0 errors, 0 warnings
+- `/dashboard` route: 4.16 kB, 281 kB First Load JS
+- `/profile` route: 615 B, 280 kB First Load JS
+- `/profile/[address]` route: 959 B, 281 kB First Load JS (dynamic)
+
+---
+
 ## Current Task
 
-_Step 9 complete. Awaiting Ludarep's instructions for Step 10._
+_Step 10 complete. Awaiting Ludarep's instructions for Step 11._
 
 ---
 
@@ -308,3 +344,5 @@ _Step 9 complete. Awaiting Ludarep's instructions for Step 10._
 - Leaderboard uses mock data — needs Supabase query in later step
 - Project data is mock — needs Supabase + admin panel integration in later steps
 - Task completion is localStorage only — needs server-side verification in later step
+- Dashboard/profile use mock user — needs Supabase user query in later step
+- getLevelLabel uses slightly different labels than xp-config titles — reconcile when wiring real data

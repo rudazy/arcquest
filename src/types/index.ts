@@ -22,3 +22,5 @@ export type {
   ProjectTask,
   Project,
 } from "./project";
+
+export type { UserNft, CompletedTask, UserProfile } from "./user";

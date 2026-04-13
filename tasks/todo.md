@@ -217,15 +217,36 @@ for Step 2 to start building features against.
 
 ---
 
+## Completed — Step 7 (2026-04-13)
+
+- Created quiz data file: `src/lib/quiz.ts`
+  - `QuizQuestion` type: id, question, options (4-tuple), correct_index, explanation
+  - 10 exact questions about Arc blockchain per spec
+  - Exports: `QUIZ_QUESTIONS` array, `QUIZ_XP_REWARD = 20`
+- Built full quiz page: `src/app/quiz/page.tsx`
+  - Pre-quiz screen: title, description, +20 XP gold badge, amber retake warning, Start button
+  - Quiz in progress: question counter, animated progress bar, 4 clickable option cards with A/B/C/D labels
+  - Correct answer: green border + checkmark, explanation shown, auto-advance after 1.2s
+  - Wrong answer: red border + X, explanation shown 1.5s, then full-screen overlay with 3s countdown, reset to Q1
+  - Attempt counter increments on each restart, shown in header and overlay
+  - Completion screen: scale-up celebration animation, green checkmark, +20 XP gold badge, XP toast trigger
+  - Already-earned tracking via localStorage key `arc_quiz_complete` — shows "already earned" message on repeat
+  - Navigation links: Go to Dashboard, View Leaderboard
+- State management: React useState only (currentQuestion, selectedOption, answerState, isComplete, hasStarted, attemptCount, alreadyEarned)
+- Build: 0 errors, 0 warnings
+- `/quiz` route: 4.33 kB, 153 kB First Load JS
+
+---
+
 ## Current Task
 
-_Step 6 complete. Awaiting Ludarep's instructions for Step 7._
+_Step 7 complete. Awaiting Ludarep's instructions for Step 8._
 
 ---
 
 ## Blockers / Decisions Pending
 
-- Quiz questions are educated guesses about Arc — confirm accuracy before launch
 - Founder X handles are placeholders (@handle1, @handle2) — need real handles
 - @arcterminal X handle is a placeholder — confirm real handle
 - Display name currently localStorage only — needs Supabase migration in later step
+- Quiz XP award is client-side localStorage only — needs server-side validation in later step

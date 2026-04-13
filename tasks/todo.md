@@ -177,12 +177,55 @@ for Step 2 to start building features against.
 
 ---
 
+## Completed — Steps 3-4 (2026-04-12)
+
+- Mapped all pages and created route scaffolds (step 3)
+- Built layout system: navbar, footer, app shell, CSS variables (step 4)
+
+---
+
+## Completed — Step 5 (2026-04-13)
+
+- Built homepage at `src/app/page.tsx`:
+  - Hero section with animated purple/cyan orbs, headline with purple glow, CTA buttons
+  - Stats bar (4 cards: Total Users, XP Earned, Tasks Completed, Projects Listed)
+  - Reusable `PhaseCarousel` component with auto-slide (3s), manual arrows/dots, framer-motion transitions
+  - Three carousel sections: Phase 1 (purple), Phase 2 (cyan, verified), Phase 3 (amber, community)
+- Files: `src/components/home/{hero,stats-bar,phase-carousel}.tsx`
+- Build: 0 errors, 0 warnings
+
+---
+
+## Completed — Step 6 (2026-04-13)
+
+- Created onboarding state machine: `src/lib/onboarding.ts`
+  - 5 steps: connect_wallet (0 XP), set_display_name (5 XP), follow_arc (5 XP),
+    follow_arcterminal (5 XP), follow_founders (10 XP) = 25 XP total
+- Built XP toast notification: `src/components/ui/xp-toast.tsx`
+  - Slide-up animation, gold text, auto-dismiss 2s, reusable via amount/trigger props
+- Built full onboarding page: `src/app/onboarding/page.tsx`
+  - Step-by-step flow with progress bar, step-specific UIs
+  - Wallet auto-advance, display name validation (3-20 chars, alphanum + underscores)
+  - Follow link pattern: open X profile, checkbox confirmation, then continue
+  - Founders step: two sub-follows, both required
+  - Completion screen with fade-in, total XP, dashboard/leaderboard links
+  - Privy error boundary for missing wallet provider
+  - Wallet guard: blocks progress if disconnected mid-flow
+  - Display name saved to localStorage (Supabase later)
+- Build: 0 errors, 0 warnings
+- `/onboarding` route: 3.42 kB, 282 kB First Load JS
+
+---
+
 ## Current Task
 
-_Step 2 complete. Awaiting Ludarep's instructions for Step 3._
+_Step 6 complete. Awaiting Ludarep's instructions for Step 7._
 
 ---
 
 ## Blockers / Decisions Pending
 
 - Quiz questions are educated guesses about Arc — confirm accuracy before launch
+- Founder X handles are placeholders (@handle1, @handle2) — need real handles
+- @arcterminal X handle is a placeholder — confirm real handle
+- Display name currently localStorage only — needs Supabase migration in later step

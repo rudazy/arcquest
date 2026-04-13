@@ -263,9 +263,39 @@ for Step 2 to start building features against.
 
 ---
 
+## Completed — Step 9 (2026-04-13)
+
+- Created project types: `src/types/project.ts`
+  - `ProjectStatus`, `ProjectTaskType`, `ProjectTask`, `Project` types
+  - Barrel-exported via `src/types/index.ts`
+- Created mock data: `src/lib/projects-mock.ts`
+  - 6 projects: 3 verified (Aave, Maple, Curve) + 3 community (Alpha, Beta, Gamma)
+  - Each with realistic tasks (onchain, social, educational), XP values, participant counts
+  - Helper functions: `getProjectBySlug()`, `getProjectsByStatus()`
+- Built projects listing page: `src/app/projects/page.tsx`
+  - Header with grid icon, subtitle
+  - Official/Community tab switcher with purple active state
+  - Community tab shows amber DYOR warning banner
+  - 2-col responsive grid of project cards
+  - Each card: gradient logo circle, status badge (cyan verified / amber community), category tag, description (2-line clamp), stats (XP / tasks / participants), "View Tasks" link
+  - Community cards have amber left border accent
+- Built project detail page: `src/app/projects/[slug]/page.tsx` + `project-detail.tsx`
+  - Server component wrapper with `generateStaticParams` — all 6 slugs pre-rendered as SSG
+  - Client component with full project detail: logo, name, status badge, category, website + X links, long description, stats
+  - Task list with type badges (onchain purple, social blue, educational gold)
+  - Each task card: title, description, XP badge, CTA button (Complete Task / Go to X / Take Quiz)
+  - Completed state: green checkmark + "Completed" label, persisted in localStorage
+  - Community warning banner at top for community projects
+  - "All Projects" back link
+- Build: 0 errors, 0 warnings
+- `/projects` route: 3.27 kB, 151 kB First Load JS
+- `/projects/[slug]` route: 4.06 kB, 151 kB First Load JS (SSG, 6 paths)
+
+---
+
 ## Current Task
 
-_Step 8 complete. Awaiting Ludarep's instructions for Step 9._
+_Step 9 complete. Awaiting Ludarep's instructions for Step 10._
 
 ---
 
@@ -276,3 +306,5 @@ _Step 8 complete. Awaiting Ludarep's instructions for Step 9._
 - Display name currently localStorage only — needs Supabase migration in later step
 - Quiz XP award is client-side localStorage only — needs server-side validation in later step
 - Leaderboard uses mock data — needs Supabase query in later step
+- Project data is mock — needs Supabase + admin panel integration in later steps
+- Task completion is localStorage only — needs server-side verification in later step

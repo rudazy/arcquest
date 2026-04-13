@@ -15,3 +15,10 @@ export type {
   LeaderboardEntry,
   LeaderboardFilter,
 } from "./leaderboard";
+
+export type {
+  ProjectStatus,
+  ProjectTaskType,
+  ProjectTask,
+  Project,
+} from "./project";

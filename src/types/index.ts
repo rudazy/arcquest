@@ -9,3 +9,9 @@ export type {
   QuizQuestion,
   XpConfig,
 } from "./xp";
+
+export type {
+  NftTier,
+  LeaderboardEntry,
+  LeaderboardFilter,
+} from "./leaderboard";

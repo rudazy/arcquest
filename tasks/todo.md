@@ -238,9 +238,34 @@ for Step 2 to start building features against.
 
 ---
 
+## Completed — Step 8 (2026-04-13)
+
+- Created leaderboard types: `src/types/leaderboard.ts`
+  - `NftTier`, `LeaderboardEntry`, `LeaderboardFilter` types
+  - Barrel-exported via `src/types/index.ts`
+- Created level color helper: `src/lib/level-colors.ts`
+  - `getLevelColor(level)` returns Tailwind text class per level (1-5)
+- Created mock data: `src/lib/leaderboard-mock.ts`
+  - 20 entries: CryptoKing (2400 XP, Lv5) through freshStart_01 (15 XP, Lv1)
+  - NFT badges consistent with XP thresholds
+- Built full leaderboard page: `src/app/leaderboard/page.tsx`
+  - Header with trophy icon, subtitle
+  - 3-tab filter: All Time (active) / This Week / By Project with project dropdown
+  - Top 3 podium (desktop only): #2 left, #1 center elevated, #3 right
+    - Gradient avatar circles with initials, rank colors (gold/silver/bronze)
+  - Full 20-row table: Rank, Display Name, Level (colored pill), XP, Tasks (hidden mobile), NFTs
+  - Rank #1/#2/#3 colored (gold/silver/bronze), rest default
+  - "ludarep" row highlighted with purple tint + "You" badge
+  - Row hover states, tabular-nums on all numeric columns
+  - "Load more" disabled placeholder button
+- Build: 0 errors, 0 warnings
+- `/leaderboard` route: 3.01 kB, 142 kB First Load JS
+
+---
+
 ## Current Task
 
-_Step 7 complete. Awaiting Ludarep's instructions for Step 8._
+_Step 8 complete. Awaiting Ludarep's instructions for Step 9._
 
 ---
 
@@ -250,3 +275,4 @@ _Step 7 complete. Awaiting Ludarep's instructions for Step 8._
 - @arcterminal X handle is a placeholder — confirm real handle
 - Display name currently localStorage only — needs Supabase migration in later step
 - Quiz XP award is client-side localStorage only — needs server-side validation in later step
+- Leaderboard uses mock data — needs Supabase query in later step

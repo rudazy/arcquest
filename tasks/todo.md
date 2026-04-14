@@ -329,9 +329,43 @@ for Step 2 to start building features against.
 
 ---
 
+## Completed — Step 11 (2026-04-14)
+
+- Created task data helpers: `src/lib/tasks-helpers.ts`
+  - `TaskWithProject` interface — extends `ProjectTask` with project metadata
+  - `getAllTasks()` — flattens all tasks from all projects into a single list
+  - `getTaskById(id)` — lookup single task with project context
+  - `getRelatedTasks(taskId, limit)` — other tasks from same project
+  - `getAllTaskIds()` — all task IDs for static params
+  - `taskStorageKey()` — shared localStorage key builder (compatible with project-detail.tsx)
+- Built tasks listing page: `src/app/tasks/page.tsx`
+  - Header with task count and total XP available
+  - 4-tab filter bar: All / Onchain / Social / Educational (purple active state)
+  - Sorted by Most XP descending (default, indicated in UI)
+  - Task cards: project logo circle, project name, type badge, task title, XP value or green "Done" status
+  - Cards link to `/tasks/[taskId]`, hover state with purple border
+  - Completion state loaded from localStorage
+- Built task detail page: `src/app/tasks/[id]/page.tsx` + `task-detail.tsx`
+  - Server wrapper with `generateStaticParams` — 15 task IDs pre-rendered as SSG
+  - Client component with Privy error boundary
+  - Header: project logo, type badge + icon, project link, title, description, XP badge
+  - Three completion flows by task type:
+    - Onchain: Privy wallet guard → "Connect Wallet to Complete" or "Complete Task" + RPC note
+    - Social: "Go to X" external link → checkbox confirmation → "Confirm Completion" button
+    - Educational: "Take Quiz" link to /quiz
+  - Completed state: green success card with checkmark, XP earned, completion date
+  - Related tasks section: up to 2 other tasks from same project, "More from [Project Name]"
+  - Completion dates stored as ISO date strings (backwards compat with legacy "true" values)
+- Build: 0 errors, 0 warnings
+- `/tasks` route: 3.58 kB, 151 kB First Load JS (static)
+- `/tasks/[id]` route: 4.8 kB, 282 kB First Load JS (SSG, 15 paths)
+- Total pages: 43
+
+---
+
 ## Current Task
 
-_Step 10 complete. Awaiting Ludarep's instructions for Step 11._
+_Step 11 complete. Awaiting Ludarep's instructions for next step._
 
 ---
 

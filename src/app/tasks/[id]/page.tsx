@@ -1,7 +1,14 @@
-export default function TaskDetailPage() {
-  return (
-    <main className="min-h-screen flex items-center justify-center">
-      <p className="text-muted-foreground text-sm">[ task detail — coming soon ]</p>
-    </main>
-  );
+import { getAllTaskIds } from "@/lib/tasks-helpers";
+import TaskDetail from "./task-detail";
+
+export function generateStaticParams() {
+  return getAllTaskIds().map((id) => ({ id }));
+}
+
+export default function TaskDetailPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  return <TaskDetail taskId={params.id} />;
 }

@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { MOCK_LEADERBOARD } from "@/lib/leaderboard-mock";
+import type { NftTier } from "@/types/leaderboard";
+
+/**
+ * Cache this route for 5 minutes (ISR).
+ */
+export const revalidate = 300;
 
 /**
  * GET /api/leaderboard — Public leaderboard.
  * Returns top users sorted by XP descending.
+ * wallet_address is NEVER included in the response.
+ *
  * Query params: ?limit=20&offset=0
  */
 export async function GET(request: Request) {
@@ -15,21 +22,16 @@ export async function GET(request: Request) {
   const supabase = createServerClient();
 
   if (!supabase) {
-    // Supabase not configured — return mock data
-    const page = MOCK_LEADERBOARD.slice(offset, offset + limit);
-    return NextResponse.json({
-      data: page,
-      total: MOCK_LEADERBOARD.length,
-      limit,
-      offset,
-    });
+    return NextResponse.json(
+      { error: "Database not configured" },
+      { status: 503 },
+    );
   }
 
   const { data, error, count } = await supabase
     .from("users")
-    .select("wallet_address, display_name, xp, level, nft_badges", {
-      count: "exact",
-    })
+    .select("display_name, xp, level, nft_badges", { count: "exact" })
+    .not("display_name", "is", null)
     .order("xp", { ascending: false })
     .range(offset, offset + limit - 1);
 
@@ -40,8 +42,17 @@ export async function GET(request: Request) {
     );
   }
 
+  const rows = (data ?? []).map((row, i) => ({
+    rank: offset + i + 1,
+    display_name: row.display_name as string,
+    xp: (row.xp as number) ?? 0,
+    level: (row.level as number) ?? 1,
+    nft_badges: ((row.nft_badges as NftTier[]) ?? []),
+    tasks_completed: 0,
+  }));
+
   return NextResponse.json({
-    data: data ?? [],
+    data: rows,
     total: count ?? 0,
     limit,
     offset,

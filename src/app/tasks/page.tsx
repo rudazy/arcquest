@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ListChecks, Check, Zap } from "lucide-react";
-import { getAllTasks, taskStorageKey } from "@/lib/tasks-helpers";
+import { taskStorageKey } from "@/lib/tasks-helpers";
+import { WalletBoundary } from "@/components/wallet-detector";
 import { cn } from "@/lib/utils";
 import type { ProjectTaskType } from "@/types/project";
 import type { TaskWithProject } from "@/lib/tasks-helpers";
@@ -118,12 +119,25 @@ function TaskListCard({
 
 export default function TasksPage() {
   const [filter, setFilter] = useState<FilterType>("all");
+  const [allTasks, setAllTasks] = useState<TaskWithProject[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  const allTasks = useMemo(() => getAllTasks(), []);
-
-  // Load completed state from localStorage
+  // Fetch tasks from API
   useEffect(() => {
+    fetch("/api/tasks")
+      .then((r) => r.json())
+      .then((json: { data?: TaskWithProject[] }) => {
+        if (Array.isArray(json.data)) setAllTasks(json.data);
+      })
+      .catch(() => {
+        // Server unavailable
+      });
+  }, []);
+
+  // Load completed state from localStorage (fast, immediate)
+  useEffect(() => {
+    if (allTasks.length === 0) return;
     const completed = new Set<string>();
     for (const task of allTasks) {
       try {
@@ -138,9 +152,38 @@ export default function TasksPage() {
     setCompletedIds(completed);
   }, [allTasks]);
 
+  // Server hydration: merge DB completion state when wallet connects
+  useEffect(() => {
+    if (!walletAddress || allTasks.length === 0) return;
+    fetch(`/api/user/tasks?wallet=${walletAddress}`)
+      .then((r) => r.json())
+      .then((json: { data?: { task_id: string }[] }) => {
+        const serverIds = new Set((json.data ?? []).map((d) => d.task_id));
+        if (serverIds.size === 0) return;
+        setCompletedIds((prev) => {
+          const merged = new Set(prev);
+          serverIds.forEach((id) => merged.add(id));
+          return merged;
+        });
+        // Sync localStorage with server truth
+        for (const task of allTasks) {
+          if (serverIds.has(task.id)) {
+            try {
+              localStorage.setItem(taskStorageKey(task.project_slug, task.id), "true");
+            } catch {
+              // localStorage unavailable
+            }
+          }
+        }
+      })
+      .catch(() => {
+        // Server unavailable — localStorage state stands
+      });
+  }, [walletAddress, allTasks]);
+
   // Filter then sort by XP descending
   const filteredTasks = useMemo(() => {
-    let tasks: TaskWithProject[] = [...allTasks];
+    let tasks = [...allTasks];
     if (filter !== "all") {
       tasks = tasks.filter((t) => t.task_type === filter);
     }
@@ -152,6 +195,8 @@ export default function TasksPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+      <WalletBoundary onWalletAddress={setWalletAddress} />
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
@@ -214,7 +259,7 @@ export default function TasksPage() {
         ))}
       </div>
 
-      {filteredTasks.length === 0 && (
+      {filteredTasks.length === 0 && allTasks.length > 0 && (
         <div className="mt-12 text-center">
           <p className="text-sm text-muted-foreground">
             No tasks match this filter.

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { AlertTriangle, Check, RotateCcw, X, Zap } from "lucide-react";
 import { QUIZ_QUESTIONS, QUIZ_XP_REWARD } from "@/lib/quiz";
+import { WalletBoundary } from "@/components/wallet-detector";
 import { XpToast } from "@/components/ui/xp-toast";
 import { cn } from "@/lib/utils";
 
@@ -28,8 +29,12 @@ export default function QuizPage() {
   const [restartCountdown, setRestartCountdown] = useState(RESTART_COUNTDOWN_S);
   const [toastAmount, setToastAmount] = useState(0);
   const [toastTrigger, setToastTrigger] = useState(0);
+  // Tracks the index chosen for each question so we can submit all at once
+  const [collectedAnswers, setCollectedAnswers] = useState<number[]>([]);
+  // Wallet address supplied by WalletBoundary — null when Privy unavailable
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  // Check localStorage on mount
+  // Check localStorage on mount (fast optimistic check)
   useEffect(() => {
     try {
       setAlreadyEarned(localStorage.getItem(STORAGE_KEY) === "true");
@@ -50,6 +55,7 @@ export default function QuizPage() {
     setShowRestartOverlay(false);
     setRestartCountdown(RESTART_COUNTDOWN_S);
     setAttemptCount((prev) => prev + 1);
+    setCollectedAnswers([]);
   }, []);
 
   // Restart countdown timer
@@ -79,19 +85,61 @@ export default function QuizPage() {
 
     if (isCorrect) {
       setAnswerState("correct");
+      // Collect this answer for the server submit
+      const nextAnswers = [...collectedAnswers, index];
+      setCollectedAnswers(nextAnswers);
+
       setTimeout(() => {
         if (currentQuestion >= TOTAL_QUESTIONS - 1) {
-          // Quiz complete
+          // All 10 correct — mark complete
           setIsComplete(true);
-          if (!alreadyEarned) {
-            try {
-              localStorage.setItem(STORAGE_KEY, "true");
-            } catch {
-              // localStorage unavailable
-            }
-            setAlreadyEarned(true);
-            showXpToast(QUIZ_XP_REWARD);
+
+          // Optimistic localStorage update
+          try {
+            localStorage.setItem(STORAGE_KEY, "true");
+          } catch {
+            // localStorage unavailable
           }
+
+          if (walletAddress) {
+            // Submit to server — server is the source of truth for XP
+            // TODO: after server confirms, call XPRegistry.sol.awardXP() onchain (Step 21+)
+            fetch("/api/quiz/submit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                wallet_address: walletAddress,
+                answers: nextAnswers,
+              }),
+            })
+              .then((r) => r.json())
+              .then(
+                (data: {
+                  success: boolean;
+                  xp_awarded?: number;
+                  xp_already_awarded?: boolean;
+                }) => {
+                  if (data.success && data.xp_awarded) {
+                    setAlreadyEarned(false); // XP just awarded fresh
+                    showXpToast(data.xp_awarded);
+                  } else if (data.xp_already_awarded) {
+                    setAlreadyEarned(true);
+                  }
+                },
+              )
+              .catch(() => {
+                // Server unavailable — fall back to local XP toast if first time
+                if (!alreadyEarned) {
+                  showXpToast(QUIZ_XP_REWARD);
+                }
+              });
+          } else {
+            // No wallet connected — use localStorage-only flow
+            if (!alreadyEarned) {
+              showXpToast(QUIZ_XP_REWARD);
+            }
+          }
+          setAlreadyEarned(true);
         } else {
           setCurrentQuestion((prev) => prev + 1);
           setSelectedOption(null);
@@ -113,6 +161,8 @@ export default function QuizPage() {
   if (!hasStarted) {
     return (
       <main className="flex min-h-[80vh] items-center justify-center px-4 py-16">
+        {/* WalletBoundary is rendered once here; React keeps it mounted across screen transitions */}
+        <WalletBoundary onWalletAddress={setWalletAddress} />
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -163,6 +213,7 @@ export default function QuizPage() {
   if (isComplete) {
     return (
       <main className="flex min-h-[80vh] items-center justify-center px-4 py-16">
+        <WalletBoundary onWalletAddress={setWalletAddress} />
         <motion.div
           initial={{ opacity: 0, scale: 0.92 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -231,6 +282,7 @@ export default function QuizPage() {
   // ─── Quiz in progress ───────────────────────────────────────────────
   return (
     <main className="flex min-h-[80vh] items-center justify-center px-4 py-16">
+      <WalletBoundary onWalletAddress={setWalletAddress} />
       {/* Restart overlay */}
       <AnimatePresence>
         {showRestartOverlay && (

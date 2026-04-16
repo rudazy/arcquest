@@ -363,9 +363,74 @@ for Step 2 to start building features against.
 
 ---
 
+## Completed — Steps 12–14 (2026-04-14)
+
+- Built admin panel: `/admin`, `/admin/projects`, `/admin/tasks`
+- Built Supabase schema (docs/schema.sql) and API route stubs
+- Built XPRegistry.sol, ArcQuestNFT.sol, deploy script, test stubs
+
+---
+
+## Completed — Steps 15–20 (2026-04-16)
+
+### Step 15: Schema verification
+- Created `docs/schema.sql` — canonical schema for all tables and the
+  `increment_xp` stored function.
+- Tables: `users`, `xp_events`, `task_completions`, `quiz_completions`,
+  `projects`, `project_tasks`.
+- RLS enabled on all tables; public read policies on `users`, `projects`,
+  `project_tasks`. Service role key bypasses RLS for all write paths.
+
+### Step 16: API routes → real Supabase queries
+- `/api/projects` — queries `projects` + `project_tasks` tables when
+  Supabase is configured; falls back to `MOCK_PROJECTS` otherwise.
+- `/api/projects/[slug]` — same pattern for single project.
+- All other routes (`/api/tasks/verify`, `/api/quiz/submit`, `/api/xp/award`,
+  `/api/leaderboard`, `/api/xp/status`) already had Supabase queries with
+  mock fallback — no changes needed.
+
+### Step 17: Privy → Supabase user upsert
+- Created `src/app/api/auth/wallet/route.ts` — POST upserts user by
+  `wallet_address`, returns `{ user, needs_onboarding: !user.display_name }`.
+- Updated `src/app/onboarding/page.tsx` — on display name submit, fires
+  POST `/api/auth/wallet` with wallet + name (fire-and-forget, UX unblocked).
+  localStorage keeps optimistic cache.
+
+### Step 18: localStorage → DB reads/writes
+- Created `src/app/api/user/tasks/route.ts` — GET returns completed
+  task IDs for a wallet from `task_completions`.
+- Created `src/components/wallet-detector.tsx` — `WalletBoundary` +
+  `WalletSideEffect` pattern for optional Privy on public pages.
+- `tasks/page.tsx` — on wallet connect, hydrates `completedIds` from server;
+  merges with localStorage. localStorage updated to stay in sync.
+- `projects/[slug]/project-detail.tsx` — same server hydration pattern.
+- `quiz/page.tsx` — collects answers per question; on completion, calls
+  `/api/quiz/submit` if wallet connected; falls back to localStorage toast
+  if server unavailable.
+
+### Step 19: Leaderboard → live Supabase query
+- `/api/leaderboard/route.ts` — `export const revalidate = 300` (5 min ISR),
+  removed `wallet_address` from select (display_name + level + xp + nft_badges
+  only, enforced in query).
+- `leaderboard/page.tsx` — on mount, fetches from `/api/leaderboard`; falls
+  back to `MOCK_LEADERBOARD` on error. Table re-renders with live data.
+
+### Step 20: E2E XP award flow
+- `task-detail.tsx` — on complete: optimistic localStorage update, then
+  POST `/api/tasks/verify`; shows `XpToast` on server confirmation.
+  Added `useWallets()` for wallet address. TODO comment for XPRegistry.sol
+  contract call (Step 21+).
+- `project-detail.tsx` — same pattern with `WalletBoundary`.
+- `/api/quiz/submit` already wired E2E (server validates all 10 answers,
+  checks `quiz_completions` for double-award, calls `increment_xp` RPC).
+- `quiz/page.tsx` — submits collected answers to `/api/quiz/submit`; uses
+  server response (`xp_already_awarded`) to control toast behavior.
+
+---
+
 ## Current Task
 
-_Step 11 complete. Awaiting Ludarep's instructions for next step._
+_Steps 15–20 complete. Awaiting Ludarep's instructions for Steps 21+._
 
 ---
 
@@ -373,10 +438,10 @@ _Step 11 complete. Awaiting Ludarep's instructions for next step._
 
 - Founder X handles are placeholders (@handle1, @handle2) — need real handles
 - @arcterminal X handle is a placeholder — confirm real handle
-- Display name currently localStorage only — needs Supabase migration in later step
-- Quiz XP award is client-side localStorage only — needs server-side validation in later step
-- Leaderboard uses mock data — needs Supabase query in later step
-- Project data is mock — needs Supabase + admin panel integration in later steps
-- Task completion is localStorage only — needs server-side verification in later step
-- Dashboard/profile use mock user — needs Supabase user query in later step
-- getLevelLabel uses slightly different labels than xp-config titles — reconcile when wiring real data
+- Dashboard/profile still use mock user data — needs Supabase user query
+- getLevelLabel uses slightly different labels than xp-config titles — reconcile
+  when wiring real data
+- XPRegistry.sol onchain award is TODO (Steps 21+) — see TODO comments in
+  task-detail.tsx, project-detail.tsx, quiz/page.tsx
+- docs/schema.sql needs to be applied in Supabase dashboard before any live
+  queries will work

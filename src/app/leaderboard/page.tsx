@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Trophy, ChevronDown } from "lucide-react";
-import { MOCK_LEADERBOARD } from "@/lib/leaderboard-mock";
 import { getLevelColor } from "@/lib/level-colors";
 import { cn } from "@/lib/utils";
-import type { LeaderboardFilter, NftTier } from "@/types/leaderboard";
+import type { LeaderboardEntry, LeaderboardFilter, NftTier } from "@/types/leaderboard";
 
 const CURRENT_USER = "ludarep";
 
@@ -162,8 +161,26 @@ export default function LeaderboardPage() {
   const [selectedProject, setSelectedProject] = useState(
     PLACEHOLDER_PROJECTS[0],
   );
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
 
-  const top3 = MOCK_LEADERBOARD.slice(0, 3);
+  useEffect(() => {
+    fetch("/api/leaderboard?limit=20&offset=0")
+      .then((r) => r.json())
+      .then((json: { data?: LeaderboardEntry[] }) => {
+        if (Array.isArray(json.data)) {
+          const mapped: LeaderboardEntry[] = json.data.map((row) => ({
+            ...row,
+            nfts: row.nft_badges ?? row.nfts ?? [],
+          }));
+          setEntries(mapped);
+        }
+      })
+      .catch(() => {
+        // Server unavailable
+      });
+  }, []);
+
+  const top3 = entries.slice(0, 3);
   // Podium order: #2 left, #1 center, #3 right
   const podiumOrder = [top3[1], top3[0], top3[2]];
 
@@ -258,7 +275,7 @@ export default function LeaderboardPage() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_LEADERBOARD.map((entry) => {
+            {entries.map((entry) => {
               const isCurrentUser = entry.display_name === CURRENT_USER;
               const rankColor =
                 RANK_COLORS[entry.rank] ?? "text-muted-foreground";

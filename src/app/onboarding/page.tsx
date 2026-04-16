@@ -230,7 +230,23 @@ function OnboardingFlow() {
 
   const handleContinue = () => {
     if (step.id === "set_display_name") {
-      localStorage.setItem("arc_display_name", displayName);
+      // Optimistic localStorage update for instant UI feedback
+      try {
+        localStorage.setItem("arc_display_name", displayName);
+      } catch {
+        // localStorage unavailable
+      }
+      // Persist to DB — fire and forget, so UX is not blocked
+      const addr = (user?.wallet as { address?: string } | undefined)?.address?.toLowerCase();
+      if (addr) {
+        fetch("/api/auth/wallet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wallet_address: addr, display_name: displayName }),
+        }).catch(() => {
+          // Server unavailable — localStorage will serve as fallback
+        });
+      }
     }
     advanceStep();
   };

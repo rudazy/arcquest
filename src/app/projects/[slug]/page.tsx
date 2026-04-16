@@ -1,9 +1,6 @@
-import { MOCK_PROJECTS } from "@/lib/projects-mock";
-import ProjectDetail from "./project-detail";
+export const dynamic = "force-dynamic";
 
-export function generateStaticParams() {
-  return MOCK_PROJECTS.map((p) => ({ slug: p.slug }));
-}
+import ProjectDetail from "./project-detail";
 
 export default async function ProjectDetailPage({
   params,

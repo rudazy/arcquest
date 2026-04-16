@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { LayoutGrid, ArrowRight, Check, AlertTriangle } from "lucide-react";
-import { getProjectsByStatus } from "@/lib/projects-mock";
 import { cn } from "@/lib/utils";
 import type { ProjectStatus, Project } from "@/types/project";
 
@@ -102,7 +101,19 @@ function ProjectCard({ project }: { project: Project }) {
 
 export default function ProjectsPage() {
   const [activeTab, setActiveTab] = useState<ProjectStatus>("verified");
-  const projects = getProjectsByStatus(activeTab);
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/projects?status=${activeTab}`)
+      .then((r) => r.json())
+      .then((json: { data?: Project[] }) => {
+        if (Array.isArray(json.data)) setProjects(json.data);
+        else setProjects([]);
+      })
+      .catch(() => {
+        setProjects([]);
+      });
+  }, [activeTab]);
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
@@ -162,6 +173,12 @@ export default function ProjectsPage() {
           <ProjectCard key={project.slug} project={project} />
         ))}
       </div>
+
+      {projects.length === 0 && (
+        <div className="mt-12 text-center">
+          <p className="text-sm text-muted-foreground">No projects found.</p>
+        </div>
+      )}
     </main>
   );
 }

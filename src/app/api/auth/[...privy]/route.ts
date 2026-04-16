@@ -23,17 +23,10 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
 
     if (!supabase) {
-      // Supabase not configured — return success with mock
-      return NextResponse.json({
-        success: true,
-        user: {
-          wallet_address: address,
-          display_name: (body.display_name as string) ?? null,
-          xp: 0,
-          level: 1,
-          created_at: new Date().toISOString(),
-        },
-      });
+      return NextResponse.json(
+        { error: "Database not configured" },
+        { status: 503 },
+      );
     }
 
     // Upsert user record

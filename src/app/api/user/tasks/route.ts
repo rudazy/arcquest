@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase";
-import { getLevel, getLevelLabel, getXpToNextLevel } from "@/lib/xp-utils";
 
 /**
- * GET /api/xp/status?wallet=0x... — Get user XP status.
- * Returns XP total, level, progress to next level.
+ * GET /api/user/tasks?wallet=0x...
+ *
+ * Returns the list of task IDs the wallet has completed.
+ * Used by the frontend to hydrate completion state from the DB on mount.
+ * Never returns wallet addresses in the response body.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -28,29 +30,22 @@ export async function GET(request: Request) {
   }
 
   const { data, error } = await supabase
-    .from("users")
-    .select("xp")
+    .from("task_completions")
+    .select("task_id, completed_at")
     .eq("wallet_address", address)
-    .single();
+    .order("completed_at", { ascending: false });
 
-  if (error || !data) {
-    // User not found — return zero state
-    return NextResponse.json({
-      wallet_address: address,
-      xp: 0,
-      level: 1,
-      level_label: getLevelLabel(1),
-      progress: getXpToNextLevel(0),
-    });
+  if (error) {
+    return NextResponse.json(
+      { error: "Failed to fetch task completions" },
+      { status: 500 },
+    );
   }
 
-  const xp = (data.xp as number) ?? 0;
-
   return NextResponse.json({
-    wallet_address: address,
-    xp,
-    level: getLevel(xp),
-    level_label: getLevelLabel(getLevel(xp)),
-    progress: getXpToNextLevel(xp),
+    data: (data ?? []).map((row) => ({
+      task_id: row.task_id as string,
+      completed_at: row.completed_at as string,
+    })),
   });
 }

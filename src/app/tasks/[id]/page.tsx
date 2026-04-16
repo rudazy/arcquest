@@ -1,9 +1,6 @@
-import { getAllTaskIds } from "@/lib/tasks-helpers";
-import TaskDetail from "./task-detail";
+export const dynamic = "force-dynamic";
 
-export function generateStaticParams() {
-  return getAllTaskIds().map((id) => ({ id }));
-}
+import TaskDetail from "./task-detail";
 
 export default function TaskDetailPage({
   params,

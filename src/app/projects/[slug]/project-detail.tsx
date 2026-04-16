@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -12,9 +12,10 @@ import {
   Users,
   ListChecks,
 } from "lucide-react";
-import { getProjectBySlug } from "@/lib/projects-mock";
+import { WalletBoundary } from "@/components/wallet-detector";
+import { XpToast } from "@/components/ui/xp-toast";
 import { cn } from "@/lib/utils";
-import type { ProjectTask, ProjectTaskType } from "@/types/project";
+import type { Project, ProjectTask, ProjectTaskType } from "@/types/project";
 
 const TASK_TYPE_BADGE: Record<
   ProjectTaskType,
@@ -128,8 +129,30 @@ function TaskCard({
 }
 
 export default function ProjectDetail({ slug }: { slug: string }) {
-  const project = getProjectBySlug(slug);
+  const [project, setProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(true);
   const [completedTasks, setCompletedTasks] = useState<Set<string>>(new Set());
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [toastAmount, setToastAmount] = useState(0);
+  const [toastTrigger, setToastTrigger] = useState(0);
+
+  const showXpToast = useCallback((amount: number) => {
+    setToastAmount(amount);
+    setToastTrigger((t) => t + 1);
+  }, []);
+
+  // Fetch project from API
+  useEffect(() => {
+    fetch(`/api/projects/${slug}`)
+      .then((r) => r.json())
+      .then((json: { data?: Project }) => {
+        if (json.data) setProject(json.data);
+      })
+      .catch(() => {
+        // Server unavailable
+      })
+      .finally(() => setLoading(false));
+  }, [slug]);
 
   // Load completed tasks from localStorage on mount
   useEffect(() => {
@@ -147,14 +170,68 @@ export default function ProjectDetail({ slug }: { slug: string }) {
     setCompletedTasks(completed);
   }, [project, slug]);
 
+  // Server hydration: merge DB completion state when wallet connects
+  useEffect(() => {
+    if (!walletAddress) return;
+    fetch(`/api/user/tasks?wallet=${walletAddress}`)
+      .then((r) => r.json())
+      .then((json: { data?: { task_id: string }[] }) => {
+        const serverIds = new Set((json.data ?? []).map((d) => d.task_id));
+        if (serverIds.size === 0) return;
+        setCompletedTasks((prev) => {
+          const merged = new Set(prev);
+          serverIds.forEach((id) => merged.add(id));
+          return merged;
+        });
+        // Sync localStorage with server truth
+        for (const id of serverIds) {
+          try {
+            localStorage.setItem(storageKey(slug, id), "true");
+          } catch {
+            // localStorage unavailable
+          }
+        }
+      })
+      .catch(() => {
+        // Server unavailable — localStorage state stands
+      });
+  }, [walletAddress, slug]);
+
   const handleComplete = (taskId: string) => {
+    // Optimistic local update
     try {
       localStorage.setItem(storageKey(slug, taskId), "true");
     } catch {
       // localStorage unavailable
     }
     setCompletedTasks((prev) => new Set(prev).add(taskId));
+
+    if (!walletAddress) return;
+
+    // TODO: after server confirms, call XPRegistry.sol.awardXP() onchain (Step 21+)
+    fetch("/api/tasks/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wallet_address: walletAddress, task_id: taskId }),
+    })
+      .then((r) => r.json())
+      .then((data: { success: boolean; xp_awarded?: number }) => {
+        if (data.success && data.xp_awarded) {
+          showXpToast(data.xp_awarded);
+        }
+      })
+      .catch(() => {
+        // Server unavailable — localStorage update still applied
+      });
   };
+
+  if (loading) {
+    return (
+      <main className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-4">
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </main>
+    );
+  }
 
   if (!project) {
     return (
@@ -177,6 +254,9 @@ export default function ProjectDetail({ slug }: { slug: string }) {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+      <WalletBoundary onWalletAddress={setWalletAddress} />
+      <XpToast amount={toastAmount} trigger={toastTrigger} />
+
       {/* Back link */}
       <Link
         href="/projects"

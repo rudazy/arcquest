@@ -52,11 +52,10 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
 
     if (!supabase) {
-      // Supabase not configured — return mock success
-      return NextResponse.json({
-        success: true,
-        xp_awarded: QUIZ_XP_REWARD,
-      });
+      return NextResponse.json(
+        { error: "Database not configured" },
+        { status: 503 },
+      );
     }
 
     // Check if XP already awarded

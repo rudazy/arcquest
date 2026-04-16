@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft, ListChecks, Pencil, Ban } from "lucide-react";
-import { getAllTasks } from "@/lib/tasks-helpers";
-import { MOCK_PROJECTS } from "@/lib/projects-mock";
 import { cn } from "@/lib/utils";
 import type { ProjectTaskType } from "@/types/project";
+import type { TaskWithProject } from "@/lib/tasks-helpers";
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -28,7 +27,7 @@ const TASK_TYPE_BADGE: Record<
   },
 };
 
-// Deterministic mock completions per task ID
+// Deterministic display completions per task ID (placeholder until completions API)
 function mockCompletions(taskId: string): number {
   let hash = 0;
   for (let i = 0; i < taskId.length; i++) {
@@ -41,12 +40,26 @@ function mockCompletions(taskId: string): number {
 
 export default function AdminTasksPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [allTasks, setAllTasks] = useState<TaskWithProject[]>([]);
 
-  const allTasks = useMemo(() => getAllTasks(), []);
-  const projectNames = useMemo(
-    () => MOCK_PROJECTS.map((p) => ({ slug: p.slug, name: p.name })),
-    [],
-  );
+  useEffect(() => {
+    fetch("/api/tasks")
+      .then((r) => r.json())
+      .then((json: { data?: TaskWithProject[] }) => {
+        if (Array.isArray(json.data)) setAllTasks(json.data);
+      })
+      .catch(() => {
+        // Server unavailable
+      });
+  }, []);
+
+  const projectNames = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const t of allTasks) {
+      if (!seen.has(t.project_slug)) seen.set(t.project_slug, t.project_name);
+    }
+    return Array.from(seen.entries()).map(([slug, name]) => ({ slug, name }));
+  }, [allTasks]);
 
   const filteredTasks = useMemo(() => {
     if (projectFilter === "all") return allTasks;
@@ -170,10 +183,7 @@ export default function AdminTasksPage() {
 
                   {/* XP */}
                   <td className="px-4 py-3 tabular-nums">
-                    <span
-                      className="font-bold"
-                      style={{ color: "#f5c842" }}
-                    >
+                    <span className="font-bold" style={{ color: "#f5c842" }}>
                       {task.xp_reward}
                     </span>
                   </td>
@@ -217,7 +227,6 @@ export default function AdminTasksPage() {
         </div>
       )}
 
-      {/* Count */}
       <p className="mt-4 text-xs text-muted-foreground">
         Showing {filteredTasks.length} of {allTasks.length} tasks
       </p>

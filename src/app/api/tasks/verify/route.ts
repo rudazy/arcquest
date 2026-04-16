@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { createServerClient } from "@/lib/supabase";
-import { getTaskById } from "@/lib/tasks-helpers";
 
 const verifySchema = z.object({
   wallet_address: z.string().min(10),
@@ -28,26 +27,31 @@ export async function POST(request: NextRequest) {
     }
 
     const { wallet_address, task_id } = parsed.data;
-    const task = getTaskById(task_id);
+    const supabase = createServerClient();
 
-    if (!task) {
+    if (!supabase) {
+      return NextResponse.json(
+        { error: "Database not configured" },
+        { status: 503 },
+      );
+    }
+
+    // Fetch task from DB to get xp_reward and project_slug
+    const { data: taskData, error: taskError } = await supabase
+      .from("project_tasks")
+      .select("id, xp_reward, project_slug")
+      .eq("id", task_id)
+      .single();
+
+    if (taskError || !taskData) {
       return NextResponse.json(
         { error: "Task not found" },
         { status: 404 },
       );
     }
 
-    const supabase = createServerClient();
-
-    if (!supabase) {
-      // Supabase not configured — return mock success
-      return NextResponse.json({
-        success: true,
-        task_id,
-        xp_awarded: task.xp_reward,
-        verified_at: new Date().toISOString(),
-      });
-    }
+    const xpReward = taskData.xp_reward as number;
+    const projectSlug = taskData.project_slug as string;
 
     // Check if already completed
     const { data: existing } = await supabase
@@ -71,8 +75,8 @@ export async function POST(request: NextRequest) {
       .insert({
         wallet_address: wallet_address.toLowerCase(),
         task_id,
-        project_slug: task.project_slug,
-        xp_awarded: task.xp_reward,
+        project_slug: projectSlug,
+        xp_awarded: xpReward,
         completed_at: now,
       });
 
@@ -86,7 +90,7 @@ export async function POST(request: NextRequest) {
     // Award XP
     const { error: xpError } = await supabase.rpc("increment_xp", {
       p_wallet: wallet_address.toLowerCase(),
-      p_amount: task.xp_reward,
+      p_amount: xpReward,
     });
 
     if (xpError) {
@@ -99,7 +103,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       task_id,
-      xp_awarded: task.xp_reward,
+      xp_awarded: xpReward,
       verified_at: now,
     });
   } catch {

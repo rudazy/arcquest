@@ -1,9 +1,9 @@
 "use client";
 
-import React, { Component, useState, useEffect } from "react";
+import React, { Component, useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import {
   ArrowLeft,
   Check,
@@ -13,11 +13,8 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import {
-  getTaskById,
-  getRelatedTasks,
-  taskStorageKey,
-} from "@/lib/tasks-helpers";
+import { taskStorageKey } from "@/lib/tasks-helpers";
+import { XpToast } from "@/components/ui/xp-toast";
 import { cn } from "@/lib/utils";
 import type { ProjectTaskType } from "@/types/project";
 import type { TaskWithProject } from "@/lib/tasks-helpers";
@@ -80,7 +77,6 @@ function getCompletionDate(projectSlug: string, taskId: string): string | null {
   try {
     const val = localStorage.getItem(taskStorageKey(projectSlug, taskId));
     if (!val) return null;
-    // Legacy "true" values have no date
     if (val === "true") return "Completed";
     return val;
   } catch {
@@ -142,18 +138,74 @@ function RelatedCard({ task }: { task: TaskWithProject }) {
 
 function TaskDetailContent({ taskId }: { taskId: string }) {
   const { ready, authenticated, login } = usePrivy();
-  const task = getTaskById(taskId);
-  const relatedTasks = getRelatedTasks(taskId, 2);
+  const { wallets } = useWallets();
 
+  const [task, setTask] = useState<TaskWithProject | null>(null);
+  const [relatedTasks, setRelatedTasks] = useState<TaskWithProject[]>([]);
+  const [loading, setLoading] = useState(true);
   const [completionDate, setCompletionDate] = useState<string | null>(null);
   const [socialChecked, setSocialChecked] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toastAmount, setToastAmount] = useState(0);
+  const [toastTrigger, setToastTrigger] = useState(0);
 
-  // Load completion state
+  const showXpToast = useCallback((amount: number) => {
+    setToastAmount(amount);
+    setToastTrigger((t) => t + 1);
+  }, []);
+
+  const walletAddress = wallets[0]?.address?.toLowerCase() ?? null;
+
+  // Fetch task from API
+  useEffect(() => {
+    fetch(`/api/tasks/${taskId}`)
+      .then((r) => r.json())
+      .then((json: { data?: TaskWithProject; related?: TaskWithProject[] }) => {
+        if (json.data) setTask(json.data);
+        if (json.related) setRelatedTasks(json.related);
+      })
+      .catch(() => {
+        // Server unavailable
+      })
+      .finally(() => setLoading(false));
+  }, [taskId]);
+
+  // Load completion from localStorage
   useEffect(() => {
     if (!task) return;
     const date = getCompletionDate(task.project_slug, task.id);
     setCompletionDate(date);
   }, [task]);
+
+  // Server hydration: verify completion state from DB when wallet connects
+  useEffect(() => {
+    if (!task || !walletAddress) return;
+    fetch(`/api/user/tasks?wallet=${walletAddress}`)
+      .then((r) => r.json())
+      .then((json: { data?: { task_id: string; completed_at: string }[] }) => {
+        const found = (json.data ?? []).find((d) => d.task_id === task.id);
+        if (found) {
+          const dateStr = found.completed_at.split("T")[0] ?? "Completed";
+          setCompletionDate((prev) => prev ?? dateStr);
+          try {
+            localStorage.setItem(taskStorageKey(task.project_slug, task.id), dateStr);
+          } catch {
+            // localStorage unavailable
+          }
+        }
+      })
+      .catch(() => {
+        // Server unavailable — localStorage state stands
+      });
+  }, [task, walletAddress]);
+
+  if (loading) {
+    return (
+      <main className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-4">
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      </main>
+    );
+  }
 
   if (!task) {
     return (
@@ -179,6 +231,28 @@ function TaskDetailContent({ taskId }: { taskId: string }) {
   const handleComplete = () => {
     const date = markCompleted(task.project_slug, task.id);
     setCompletionDate(date);
+
+    if (!walletAddress || isSubmitting) return;
+    setIsSubmitting(true);
+
+    // TODO: after server confirms, call XPRegistry.sol.awardXP() onchain (Step 21+)
+    fetch("/api/tasks/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wallet_address: walletAddress, task_id: task.id }),
+    })
+      .then((r) => r.json())
+      .then((data: { success: boolean; xp_awarded?: number }) => {
+        if (data.success && data.xp_awarded) {
+          showXpToast(data.xp_awarded);
+        }
+      })
+      .catch(() => {
+        // Server unavailable — localStorage update still applied above
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   };
 
   const handleSocialConfirm = () => {
@@ -414,6 +488,8 @@ function TaskDetailContent({ taskId }: { taskId: string }) {
           </div>
         </motion.div>
       )}
+
+      <XpToast amount={toastAmount} trigger={toastTrigger} />
     </main>
   );
 }

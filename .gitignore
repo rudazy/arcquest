@@ -48,3 +48,15 @@ next-env.d.ts
 
 # scaffold leftovers
 /scaffold-tmp
+
+# Foundry build artifacts
+contracts/broadcast/
+contracts/cache/
+contracts/out/
+
+# Local env files
+.env
+.env.local
+
+# Misc
+ tatus

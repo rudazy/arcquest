@@ -12,6 +12,14 @@ export const metadata: Metadata = {
     "Quest and XP platform for the Arc ecosystem. Complete onchain and social tasks, level up, and claim milestone NFTs.",
   applicationName: "Arc Terminal",
   robots: { index: true, follow: true },
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    shortcut: ["/favicon.png"],
+    apple: ["/icon.png"],
+  },
 };
 
 export const viewport: Viewport = {

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { Component } from "react";
+import React, { Component, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
+import { createPublicClient, http } from "viem";
 import {
   ArrowRight,
   Award,
@@ -13,13 +14,14 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
+import { env } from "@/config/env";
+import { arcQuestNftAbi } from "@/lib/abis/arcQuestNft";
+import { xpRegistryAbi } from "@/lib/abis/xpRegistry";
 import { MOCK_USER } from "@/lib/user-mock";
 import { getLevelLabel, getXpToNextLevel } from "@/lib/xp-utils";
 import { getLevelColor } from "@/lib/level-colors";
 import { cn } from "@/lib/utils";
 import type { NftTier } from "@/types/leaderboard";
-
-// ─── Privy error boundary ─────────────────────────────────────────────
 
 class PrivyBoundary extends Component<
   { children: React.ReactNode },
@@ -47,8 +49,6 @@ class PrivyBoundary extends Component<
     return this.props.children;
   }
 }
-
-// ─── Helpers ───────────────────────────────────────────────────────────
 
 function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
@@ -87,19 +87,22 @@ const PROJECT_COLORS: Record<string, string> = {
   curve: "#E64980",
 };
 
-// ─── NFT milestone card ───────────────────────────────────────────────
-
 const NFT_CONFIG: {
   tier: NftTier;
   label: string;
   xp: number;
   icon: string;
   soulbound: boolean;
+  tokenId: bigint;
 }[] = [
-  { tier: "bronze", label: "Bronze Badge", xp: 100, icon: "\u{1F949}", soulbound: true },
-  { tier: "silver", label: "Silver Badge", xp: 500, icon: "\u{1F948}", soulbound: true },
-  { tier: "gold", label: "Gold Badge", xp: 1000, icon: "\u{1F947}", soulbound: false },
+  { tier: "bronze", label: "Bronze Badge", xp: 100, icon: "🥉", soulbound: true, tokenId: 1n },
+  { tier: "silver", label: "Silver Badge", xp: 500, icon: "🥈", soulbound: true, tokenId: 2n },
+  { tier: "gold", label: "Gold Badge", xp: 1000, icon: "🥇", soulbound: false, tokenId: 3n },
 ];
+
+type ChainBadgeState = {
+  claimed: boolean;
+};
 
 function NftMilestoneCard({
   label,
@@ -107,7 +110,6 @@ function NftMilestoneCard({
   icon,
   soulbound,
   earned,
-  earnedAt,
   userXp,
 }: {
   label: string;
@@ -115,10 +117,10 @@ function NftMilestoneCard({
   icon: string;
   soulbound: boolean;
   earned: boolean;
-  earnedAt?: string;
   userXp: number;
 }) {
   const progress = Math.min((userXp / threshold) * 100, 100);
+  const eligible = userXp >= threshold;
 
   return (
     <div
@@ -126,7 +128,7 @@ function NftMilestoneCard({
         "flex flex-col items-center rounded-lg border p-5 text-center transition-colors",
         earned
           ? "border-border bg-card shadow-md"
-          : "border-border/50 bg-card/40 opacity-60",
+          : "border-border/50 bg-card/40",
       )}
     >
       <span className={cn("text-3xl", !earned && "grayscale")}>{icon}</span>
@@ -136,8 +138,8 @@ function NftMilestoneCard({
       </span>
 
       {earned ? (
-        <p className="mt-2 text-[10px] text-muted-foreground">
-          Earned {earnedAt}
+        <p className="mt-2 text-[10px] font-medium text-emerald-400">
+          Claimed onchain
         </p>
       ) : (
         <>
@@ -150,16 +152,82 @@ function NftMilestoneCard({
               style={{ width: `${progress}%` }}
             />
           </div>
+          <span
+            className={cn(
+              "mt-3 inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium",
+              eligible
+                ? "bg-[#7B5EA7]/15 text-[#b49ad7]"
+                : "bg-muted text-muted-foreground",
+            )}
+          >
+            {eligible ? "Claimable" : "Locked"}
+          </span>
         </>
       )}
     </div>
   );
 }
 
-// ─── Dashboard content ────────────────────────────────────────────────
-
 function DashboardContent() {
-  const { ready, authenticated, login } = usePrivy();
+  const { ready, authenticated, login, user: privyUser } = usePrivy();
+  const walletAddress = privyUser?.wallet?.address as `0x${string}` | undefined;
+
+  const [liveXp, setLiveXp] = useState<number | null>(null);
+  const [badgeState, setBadgeState] = useState<Record<string, ChainBadgeState>>(
+    {},
+  );
+
+  const publicClient = useMemo(() => {
+    if (!env.NEXT_PUBLIC_ARC_RPC_URL) return null;
+    return createPublicClient({
+      transport: http(env.NEXT_PUBLIC_ARC_RPC_URL),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!publicClient || !walletAddress) return;
+    if (!env.NEXT_PUBLIC_XP_REGISTRY_ADDRESS) return;
+    if (!env.NEXT_PUBLIC_ARCQUEST_NFT_ADDRESS) return;
+
+    let cancelled = false;
+
+    async function loadOnchainData() {
+      try {
+        const xp = await publicClient.readContract({
+          address: env.NEXT_PUBLIC_XP_REGISTRY_ADDRESS as `0x${string}`,
+          abi: xpRegistryAbi,
+          functionName: "totalXP",
+          args: [walletAddress],
+        });
+
+        const nextBadgeState: Record<string, ChainBadgeState> = {};
+
+        for (const nft of NFT_CONFIG) {
+          const claimed = await publicClient.readContract({
+            address: env.NEXT_PUBLIC_ARCQUEST_NFT_ADDRESS as `0x${string}`,
+            abi: arcQuestNftAbi,
+            functionName: "claimed",
+            args: [walletAddress, nft.tokenId],
+          });
+
+          nextBadgeState[nft.tier] = { claimed };
+        }
+
+        if (!cancelled) {
+          setLiveXp(Number(xp));
+          setBadgeState(nextBadgeState);
+        }
+      } catch (error) {
+        console.error("Failed to load onchain dashboard data", error);
+      }
+    }
+
+    void loadOnchainData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [publicClient, walletAddress]);
 
   if (!ready) {
     return (
@@ -169,7 +237,6 @@ function DashboardContent() {
     );
   }
 
-  // Wallet guard
   if (!authenticated) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
@@ -193,15 +260,15 @@ function DashboardContent() {
   }
 
   const user = MOCK_USER;
+  const displayedXp = liveXp ?? user.xp;
   const levelLabel = getLevelLabel(user.level);
-  const xpInfo = getXpToNextLevel(user.xp);
+  const xpInfo = getXpToNextLevel(displayedXp);
   const xpRemaining = xpInfo.required - xpInfo.current;
   const progressPercent = (xpInfo.current / xpInfo.required) * 100;
   const recentTasks = user.tasks_completed.slice(0, 5);
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-      {/* Section 1 — User header */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -231,7 +298,6 @@ function DashboardContent() {
         </div>
       </motion.div>
 
-      {/* Section 2 — XP Progress */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -243,7 +309,7 @@ function DashboardContent() {
             className="text-3xl font-bold tabular-nums"
             style={{ color: "#f5c842" }}
           >
-            {user.xp.toLocaleString()} XP
+            {displayedXp.toLocaleString()} XP
           </span>
           <span className="text-xs text-muted-foreground">
             Level {user.level} — {levelLabel}
@@ -265,7 +331,6 @@ function DashboardContent() {
         </p>
       </motion.div>
 
-      {/* Section 3 — Stats row */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           {
@@ -275,7 +340,7 @@ function DashboardContent() {
           },
           {
             label: "XP Earned",
-            value: user.xp.toLocaleString(),
+            value: displayedXp.toLocaleString(),
             icon: Zap,
             gold: true,
           },
@@ -319,7 +384,6 @@ function DashboardContent() {
         ))}
       </div>
 
-      {/* Section 4 — NFT Milestones */}
       <div className="mt-8">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           <Award className="h-4 w-4" />
@@ -327,7 +391,8 @@ function DashboardContent() {
         </h2>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {NFT_CONFIG.map((nft) => {
-            const userNft = user.nfts.find((n) => n.tier === nft.tier);
+            const earned = badgeState[nft.tier]?.claimed ?? false;
+
             return (
               <NftMilestoneCard
                 key={nft.tier}
@@ -335,16 +400,14 @@ function DashboardContent() {
                 xp={nft.xp}
                 icon={nft.icon}
                 soulbound={nft.soulbound}
-                earned={!!userNft}
-                earnedAt={userNft?.earned_at}
-                userXp={user.xp}
+                earned={earned}
+                userXp={displayedXp}
               />
             );
           })}
         </div>
       </div>
 
-      {/* Section 5 — Recent Activity */}
       <div className="mt-8">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           <ListChecks className="h-4 w-4" />
@@ -403,7 +466,6 @@ function DashboardContent() {
         </Link>
       </div>
 
-      {/* Section 6 — Quick actions */}
       <div className="mt-8 flex flex-col gap-3 sm:flex-row">
         <Link
           href="/tasks"

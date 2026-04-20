@@ -82,8 +82,16 @@ export function Navbar() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
       <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="font-mono text-sm font-semibold tracking-tight text-foreground">
-          Arc Terminal
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground"
+        >
+          <img
+            src="/logo.png"
+            alt="Arc Terminal logo"
+            className="h-8 w-8 object-contain"
+          />
+          <span className="font-mono">Arc Terminal</span>
         </Link>
 
         <ul className="hidden items-center gap-6 md:flex">
